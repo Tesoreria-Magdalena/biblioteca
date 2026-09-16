@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Lector de EPUB</title>
+<title>Biblioteca de Ervin Santiago</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;0,600;0,700;1,500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -227,27 +227,112 @@
   }
   .cover-wrap img{ width:100%; height:100%; object-fit:cover; display:block; }
   .cover-placeholder{
-    width:100%; height:100%; display:flex; align-items:center; justify-content:center;
-    background: var(--accent); font-family:'Fraunces', serif; font-size:2.1rem; font-weight:600;
-    color:#fff; text-align:center; padding:10px;
+    width:100%; height:100%; position:relative; overflow:hidden;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background: var(--accent);
+    background: linear-gradient(155deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 62%, black) 100%);
+    color:#fff; text-align:center; padding:16px;
+  }
+  .cover-placeholder::before{
+    content:"";
+    position:absolute; inset:0;
+    background:
+      radial-gradient(circle at 25% 15%, rgba(255,255,255,0.16), transparent 45%),
+      repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 16px);
+    pointer-events:none;
+  }
+  .cover-placeholder .initial{
+    font-family:'Fraunces', serif; font-weight:600; font-size:2.3rem; line-height:1;
+    position:relative; z-index:1;
+  }
+  .cover-placeholder .rule{
+    width:26px; height:2px; background: rgba(255,255,255,0.6);
+    margin:12px 0 10px; position:relative; z-index:1;
+  }
+  .cover-placeholder .mini-title{
+    font-family:'Source Sans 3', sans-serif; font-weight:600; font-size:0.62rem;
+    text-transform:uppercase; letter-spacing:0.05em; line-height:1.4; opacity:0.88;
+    position:relative; z-index:1; max-width:100%;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
   }
   .cover-upload-btn{
     position:absolute; bottom:6px; left:6px; right:6px;
     background: rgba(0,0,0,0.6); color:#fff; border:none; border-radius:3px;
-    font-size:0.7rem; padding:6px 4px; cursor:pointer; opacity:0;
-    transition: opacity 0.15s ease; font-family:'Source Sans 3', sans-serif;
+    font-size:0.7rem; padding:6px 4px; cursor:pointer;
+    font-family:'Source Sans 3', sans-serif;
   }
-  .cover-wrap:hover .cover-upload-btn{ opacity:1; }
   .tile-delete{
     position:absolute; top:6px; right:6px; width:22px; height:22px; border-radius:50%;
     border:none; background: rgba(0,0,0,0.6); color:#fff; cursor:pointer;
-    font-size:0.9rem; line-height:1; opacity:0; transition: opacity 0.15s ease;
+    font-size:0.9rem; line-height:1;
   }
-  .cover-wrap:hover .tile-delete{ opacity:1; }
+  .tile-ficha-btn{
+    position:absolute; top:6px; left:6px;
+    background: rgba(0,0,0,0.6); color:#fff; border:none; border-radius:3px;
+    font-size:0.68rem; padding:4px 8px; cursor:pointer;
+    font-family:'Source Sans 3', sans-serif;
+  }
   .tile-title{ font-family:'Fraunces', serif; font-weight:600; font-size:0.9rem; margin:10px 0 2px; line-height:1.3; }
   .tile-author{ color: var(--muted); font-size:0.78rem; margin:0 0 4px; }
   .tile-progress{ color: var(--accent); font-size:0.75rem; font-weight:600; }
+  .tile-meta{ color: var(--muted); font-size:0.74rem; margin:2px 0 0; }
+  .tile-status-pill{
+    display:inline-block; margin-top:6px; padding:2px 8px; border-radius:10px;
+    font-size:0.68rem; font-weight:600; background: var(--panel); border:1px solid var(--line); color: var(--muted);
+  }
+  .tile-status-pill.leyendo{ background: color-mix(in srgb, var(--accent) 16%, var(--panel)); color: var(--accent); border-color: transparent; }
+  .tile-status-pill.terminado{ background: color-mix(in srgb, var(--forest, #2C4A3E) 18%, var(--panel)); color: #2C4A3E; border-color: transparent; }
   .lib-empty-hint{ margin-top:30px; color: var(--muted); font-size:0.92rem; text-align:center; display:none; }
+
+  /* ---------- Ficha del libro (modal) ---------- */
+  .ficha-overlay{
+    display:none; position:fixed; inset:0; z-index:40;
+    background: rgba(0,0,0,0.45);
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .ficha-overlay.show{ display:flex; }
+  .ficha-modal{
+    background: var(--card, var(--panel)); border-radius:6px; width:100%; max-width:560px;
+    max-height:88vh; overflow-y:auto; box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+  }
+  .ficha-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 22px; border-bottom:1px solid var(--line);
+    position:sticky; top:0; background: var(--card, var(--panel));
+  }
+  .ficha-header h3{ font-family:'Fraunces', serif; font-weight:600; font-size:1.15rem; margin:0; }
+  .ficha-header button{
+    background:none; border:1px solid var(--line); border-radius:3px; color: var(--muted);
+    font-family:'Source Sans 3', sans-serif; font-size:0.82rem; padding:6px 12px; cursor:pointer;
+  }
+  .ficha-body{ padding:20px 22px; }
+  .ficha-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px 16px; }
+  .ficha-grid label{
+    display:flex; flex-direction:column; gap:5px;
+    font-size:0.78rem; font-weight:600; color: var(--muted);
+  }
+  .ficha-grid label.span2{ grid-column: 1 / -1; }
+  .ficha-grid input, .ficha-grid select, .ficha-grid textarea{
+    font-family:'Source Sans 3', sans-serif; font-size:0.88rem; color: var(--fg);
+    border:1px solid var(--line); border-radius:3px; padding:8px 10px; background:#fff;
+  }
+  .ficha-grid textarea{ resize:vertical; min-height:70px; }
+  @media (max-width:520px){ .ficha-grid{ grid-template-columns:1fr; } }
+  .star-rating{ display:flex; gap:4px; }
+  .star-rating button{
+    background:none; border:none; cursor:pointer; font-size:1.3rem; line-height:1;
+    color: var(--line); padding:0;
+  }
+  .star-rating button.filled{ color: var(--gold, #B8935A); }
+  .ficha-footer{
+    padding:16px 22px; border-top:1px solid var(--line);
+    display:flex; justify-content:flex-end; gap:10px;
+  }
+  .ficha-footer button{
+    font-family:'Source Sans 3', sans-serif; font-weight:600; font-size:0.88rem;
+    background: var(--accent); color:#fff; border:none; border-radius:3px;
+    padding:10px 20px; cursor:pointer;
+  }
 
   #sel-popup{
     display:none; position: fixed; z-index: 30;
@@ -271,7 +356,7 @@
   <div class="lib-wrap">
     <div class="lib-header">
       <div>
-        <h1>Tu librero</h1>
+        <h1>Biblioteca de Ervin Santiago</h1>
         <p>Los libros, portadas, marcadores y notas se guardan en este navegador. Nada se sube a ningún servidor.</p>
       </div>
       <div class="lib-toolbar">
@@ -370,6 +455,76 @@
 <div id="sel-popup">
   <button id="sel-highlight">Resaltar</button>
   <button id="sel-note">Resaltar + nota</button>
+</div>
+
+<div class="ficha-overlay" id="ficha-overlay">
+  <div class="ficha-modal">
+    <div class="ficha-header">
+      <h3>Ficha del libro</h3>
+      <button id="ficha-close">Cerrar</button>
+    </div>
+    <div class="ficha-body">
+      <div class="ficha-grid">
+        <label class="span2">Título
+          <input type="text" id="ficha-title" />
+        </label>
+        <label>Autor
+          <input type="text" id="ficha-author" />
+        </label>
+        <label>Año de publicación
+          <input type="text" id="ficha-year" placeholder="ej. 1967" />
+        </label>
+        <label>País
+          <input type="text" id="ficha-country" placeholder="ej. Colombia" />
+        </label>
+        <label>Editorial
+          <input type="text" id="ficha-publisher" />
+        </label>
+        <label>Idioma
+          <input type="text" id="ficha-language" placeholder="ej. Español" />
+        </label>
+        <label>Páginas
+          <input type="text" id="ficha-pages" />
+        </label>
+        <label class="span2">Género / etiquetas
+          <input type="text" id="ficha-genres" placeholder="ej. novela, realismo mágico" />
+        </label>
+        <label class="span2">Colección / serie
+          <input type="text" id="ficha-series" placeholder="ej. El Club Diógenes #12" />
+        </label>
+        <label>Estado de lectura
+          <select id="ficha-status">
+            <option value="">Sin definir</option>
+            <option value="por-leer">Por leer</option>
+            <option value="leyendo">Leyendo</option>
+            <option value="terminado">Terminado</option>
+            <option value="abandonado">Abandonado</option>
+          </select>
+        </label>
+        <label>Calificación
+          <div class="star-rating" id="ficha-rating">
+            <button type="button" data-v="1">★</button>
+            <button type="button" data-v="2">★</button>
+            <button type="button" data-v="3">★</button>
+            <button type="button" data-v="4">★</button>
+            <button type="button" data-v="5">★</button>
+          </div>
+        </label>
+        <label>Fecha de inicio
+          <input type="date" id="ficha-date-start" />
+        </label>
+        <label>Fecha de término
+          <input type="date" id="ficha-date-end" />
+        </label>
+        <label class="span2">Reseña personal
+          <textarea id="ficha-review" rows="4" placeholder="Qué te pareció…"></textarea>
+        </label>
+      </div>
+    </div>
+    <div class="ficha-footer">
+      <button id="ficha-save">Guardar ficha</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -938,6 +1093,10 @@ async function parseEpubMeta(file){
     return rec.chaptersCount ? (rec.chaptersCount + (rec.chaptersCount === 1 ? ' capítulo' : ' capítulos')) : '';
   }
 
+  var STATUS_LABELS = {
+    'por-leer': 'Por leer', 'leyendo': 'Leyendo', 'terminado': 'Terminado', 'abandonado': 'Abandonado'
+  };
+
   function buildBookTile(rec){
     var tile = document.createElement('div');
     tile.className = 'lib-card book-tile';
@@ -955,7 +1114,15 @@ async function parseEpubMeta(file){
     } else {
       var ph = document.createElement('div');
       ph.className = 'cover-placeholder';
-      ph.textContent = (rec.title || '?').trim().charAt(0).toUpperCase();
+      var initial = document.createElement('div');
+      initial.className = 'initial';
+      initial.textContent = (rec.title || '?').trim().charAt(0).toUpperCase();
+      var rule = document.createElement('div');
+      rule.className = 'rule';
+      var mini = document.createElement('div');
+      mini.className = 'mini-title';
+      mini.textContent = rec.title || '';
+      ph.appendChild(initial); ph.appendChild(rule); ph.appendChild(mini);
       coverWrap.appendChild(ph);
     }
 
@@ -983,8 +1150,13 @@ async function parseEpubMeta(file){
       catch(err){ setLibStatus('No se pudo eliminar el libro.', true); }
     });
 
+    var fichaBtn = document.createElement('button');
+    fichaBtn.className = 'tile-ficha-btn'; fichaBtn.textContent = 'Ficha'; fichaBtn.title = 'Ver / editar ficha';
+    fichaBtn.addEventListener('click', function(e){ e.stopPropagation(); openFicha(rec.id); });
+
     coverWrap.appendChild(coverBtn);
     coverWrap.appendChild(delBtn);
+    coverWrap.appendChild(fichaBtn);
     coverWrap.appendChild(coverInput);
     coverWrap.addEventListener('click', function(){ openBookFromLibrary(rec.id); });
 
@@ -999,6 +1171,22 @@ async function parseEpubMeta(file){
     tile.appendChild(titleEl);
     if(rec.author) tile.appendChild(authorEl);
     tile.appendChild(progEl);
+
+    var metaBits = [];
+    if(rec.year) metaBits.push(rec.year);
+    if(rec.country) metaBits.push(rec.country);
+    if(metaBits.length){
+      var metaEl = document.createElement('div');
+      metaEl.className = 'tile-meta';
+      metaEl.textContent = metaBits.join(' · ');
+      tile.appendChild(metaEl);
+    }
+    if(rec.readStatus && STATUS_LABELS[rec.readStatus]){
+      var pill = document.createElement('div');
+      pill.className = 'tile-status-pill ' + rec.readStatus;
+      pill.textContent = STATUS_LABELS[rec.readStatus] + (rec.rating ? ' · ' + '★'.repeat(rec.rating) : '');
+      tile.appendChild(pill);
+    }
     return tile;
   }
 
@@ -1018,6 +1206,108 @@ async function parseEpubMeta(file){
     libEmptyHint.style.display = records.length ? 'none' : 'block';
   }
 
+  /* ---- Ficha del libro (bibliographic + personal tracking fields) ---- */
+
+  var FICHA_FIELDS = ['year','country','publisher','language','pages','genres','series','readStatus','rating','dateStart','dateEnd','review'];
+
+  var fichaOverlay = document.getElementById('ficha-overlay');
+  var fichaClose = document.getElementById('ficha-close');
+  var fichaSave = document.getElementById('ficha-save');
+  var fichaTitle = document.getElementById('ficha-title');
+  var fichaAuthor = document.getElementById('ficha-author');
+  var fichaYear = document.getElementById('ficha-year');
+  var fichaCountry = document.getElementById('ficha-country');
+  var fichaPublisher = document.getElementById('ficha-publisher');
+  var fichaLanguage = document.getElementById('ficha-language');
+  var fichaPages = document.getElementById('ficha-pages');
+  var fichaGenres = document.getElementById('ficha-genres');
+  var fichaSeries = document.getElementById('ficha-series');
+  var fichaStatus = document.getElementById('ficha-status');
+  var fichaRatingEl = document.getElementById('ficha-rating');
+  var fichaDateStart = document.getElementById('ficha-date-start');
+  var fichaDateEnd = document.getElementById('ficha-date-end');
+  var fichaReview = document.getElementById('ficha-review');
+
+  var fichaBookId = null;
+  var fichaRatingValue = 0;
+
+  function renderFichaStars(){
+    Array.prototype.slice.call(fichaRatingEl.querySelectorAll('button')).forEach(function(b){
+      b.classList.toggle('filled', +b.dataset.v <= fichaRatingValue);
+    });
+  }
+  Array.prototype.slice.call(fichaRatingEl.querySelectorAll('button')).forEach(function(b){
+    b.addEventListener('click', function(){
+      var v = +b.dataset.v;
+      fichaRatingValue = (fichaRatingValue === v) ? 0 : v;
+      renderFichaStars();
+    });
+  });
+
+  async function openFicha(id){
+    var rec = null;
+    try{ rec = await dbGetBook(id); } catch(e){}
+    if(!rec){ setLibStatus('No se pudo abrir la ficha de ese libro.', true); return; }
+    fichaBookId = id;
+    fichaTitle.value = rec.title || '';
+    fichaAuthor.value = rec.author || '';
+    fichaYear.value = rec.year || '';
+    fichaCountry.value = rec.country || '';
+    fichaPublisher.value = rec.publisher || '';
+    fichaLanguage.value = rec.language || '';
+    fichaPages.value = rec.pages || '';
+    fichaGenres.value = rec.genres || '';
+    fichaSeries.value = rec.series || '';
+    fichaStatus.value = rec.readStatus || '';
+    fichaDateStart.value = rec.dateStart || '';
+    fichaDateEnd.value = rec.dateEnd || '';
+    fichaReview.value = rec.review || '';
+    fichaRatingValue = rec.rating || 0;
+    renderFichaStars();
+    fichaOverlay.classList.add('show');
+  }
+
+  function closeFicha(){
+    fichaOverlay.classList.remove('show');
+    fichaBookId = null;
+  }
+  fichaClose.addEventListener('click', closeFicha);
+  fichaOverlay.addEventListener('click', function(e){ if(e.target === fichaOverlay) closeFicha(); });
+
+  fichaSave.addEventListener('click', async function(){
+    if(!fichaBookId) return;
+    try{
+      var rec = await dbGetBook(fichaBookId);
+      if(!rec){ closeFicha(); return; }
+      var newTitle = fichaTitle.value.trim();
+      if(newTitle) rec.title = newTitle;
+      rec.author = fichaAuthor.value.trim();
+      rec.year = fichaYear.value.trim();
+      rec.country = fichaCountry.value.trim();
+      rec.publisher = fichaPublisher.value.trim();
+      rec.language = fichaLanguage.value.trim();
+      rec.pages = fichaPages.value.trim();
+      rec.genres = fichaGenres.value.trim();
+      rec.series = fichaSeries.value.trim();
+      rec.readStatus = fichaStatus.value;
+      rec.rating = fichaRatingValue || null;
+      rec.dateStart = fichaDateStart.value;
+      rec.dateEnd = fichaDateEnd.value;
+      rec.review = fichaReview.value.trim();
+      await dbPutBook(rec);
+      if(book && book.id === fichaBookId){
+        book.title = rec.title;
+        book.author = rec.author;
+        FICHA_FIELDS.forEach(function(f){ book[f] = rec[f]; });
+      }
+      closeFicha();
+      renderLibrary();
+    } catch(err){
+      console.error(err);
+      setLibStatus('No se pudo guardar la ficha.', true);
+    }
+  });
+
   async function openBookFromLibrary(id){
     setLibStatus('Abriendo…');
     try{
@@ -1035,6 +1325,7 @@ async function parseEpubMeta(file){
       data.bookmarks = record.bookmarks || [];
       data.highlights = record.highlights || [];
       data.plainTextCache = null;
+      FICHA_FIELDS.forEach(function(f){ data[f] = record[f]; });
 
       book = data;
       currentIndex = 0;
@@ -1096,11 +1387,11 @@ async function parseEpubMeta(file){
           coverName = 'covers/' + r.id + '.' + ext;
           zip.file(coverName, r.coverBlob);
         }
-        manifest.push({
+        manifest.push(Object.assign({
           id: r.id, title: r.title, author: r.author, chaptersCount: r.chaptersCount,
           addedAt: r.addedAt, progress: r.progress, bookmarks: r.bookmarks, highlights: r.highlights,
           epubFile: epubName, coverFile: coverName
-        });
+        }, FICHA_FIELDS.reduce(function(o,f){ o[f]=r[f]; return o; }, {})));
       }
       zip.file('manifest.json', JSON.stringify(manifest, null, 2));
       var blob = await zip.generateAsync({type: 'blob'});
@@ -1144,6 +1435,7 @@ async function parseEpubMeta(file){
           coverBlob: coverBlob, addedAt: m.addedAt || Date.now(),
           progress: m.progress || null, bookmarks: m.bookmarks || [], highlights: m.highlights || []
         };
+        FICHA_FIELDS.forEach(function(f){ record[f] = m[f]; });
         await dbPutBook(record);
         imported++;
       }
@@ -1197,7 +1489,7 @@ async function parseEpubMeta(file){
 
   function persistState(){
     if(!book) return;
-    dbPutBook({
+    var record = {
       id: book.id,
       title: book.title,
       author: book.author,
@@ -1208,7 +1500,9 @@ async function parseEpubMeta(file){
       progress: book.progress,
       bookmarks: book.bookmarks,
       highlights: book.highlights
-    }).catch(function(err){ console.error('No se pudo guardar el progreso', err); });
+    };
+    FICHA_FIELDS.forEach(function(f){ record[f] = book[f]; });
+    dbPutBook(record).catch(function(err){ console.error('No se pudo guardar el progreso', err); });
   }
 
   function saveProgress(){
