@@ -95,6 +95,20 @@
   }
   #toc-list li a:hover{ background: rgba(0,0,0,0.04); }
   #toc-list li a.active{ border-left-color: var(--accent); color: var(--accent); font-weight:600; }
+  #toc-list li.toc-edit-row{
+    display:flex; align-items:center; gap:6px; padding:8px 12px;
+    border-bottom:1px solid var(--line);
+  }
+  #toc-list li.toc-edit-row input[type=text]{
+    flex:1; min-width:0; font-family:'Source Sans 3', sans-serif; font-size:0.82rem;
+    border:1px solid var(--line); border-radius:3px; padding:6px 8px; background:#fff; color:#111;
+  }
+  #toc-list li.toc-edit-row button{
+    background:none; border:1px solid var(--line); border-radius:3px; color: var(--muted);
+    font-size:0.75rem; padding:4px 6px; cursor:pointer; line-height:1;
+  }
+  #toc-list li.toc-edit-row button.hide-toggle.hidden-on{ background: var(--accent); color:#fff; border-color: var(--accent); }
+  #toc-edit-hint{ padding: 0 18px 10px; color: var(--muted); font-size:0.78rem; line-height:1.45; }
 
   .search-box{ padding: 0 18px 12px; display:flex; gap:6px; }
   .search-box input{
@@ -133,6 +147,10 @@
     font-family: var(--content-font, 'Source Serif 4'), serif;
     line-height: 1.7;
     padding-top: 34px;
+  }
+  #chapter-content.editing{
+    outline: 2px dashed var(--accent); outline-offset: 10px; border-radius: 4px;
+    cursor: text;
   }
   #chapter-content h1, #chapter-content h2, #chapter-content h3{
     font-family: 'Fraunces', serif; font-weight:600; line-height:1.25;
@@ -385,6 +403,8 @@
     <button class="icon-btn" id="search-toggle">Buscar</button>
     <button class="icon-btn" id="bookmark-add">+ Marcador</button>
     <button class="icon-btn" id="listen-toggle">Escuchar</button>
+    <button class="icon-btn" id="edit-toggle">Editar</button>
+    <button class="icon-btn" id="edit-save" style="display:none;">Guardar cambios en el archivo</button>
     <div class="titles">
       <div class="t-title" id="toolbar-title"></div>
       <div class="t-progress" id="toolbar-progress"></div>
@@ -543,6 +563,107 @@ function resolvePath(dir, href){
 
 function dirOf(path){
   return path.indexOf('/') !== -1 ? path.slice(0, path.lastIndexOf('/')) : '';
+}
+
+function escapeXml(s){
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&apos;');
+}
+
+function generateUUID(){
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
+    var r = Math.random()*16|0, v = c==='x' ? r : (r&0x3|0x8);
+    return v.toString(16);
+  });
+}
+
+/* Rebuilds a self-contained EPUB from the current in-memory chapters, so that
+   corrections made in edit mode (renamed/reordered/hidden chapters, edited
+   chapter text) get baked into the actual file — not just the display layer.
+   Chapter HTML may reference images as blob: URLs (created when the original
+   EPUB was parsed); those are re-fetched and re-embedded as real image files. */
+async function rebuildEpubFromBook(bookData){
+  var zip = new JSZip();
+  zip.file('mimetype', 'application/epub+zip', {compression: 'STORE'});
+  zip.folder('META-INF').file('container.xml',
+    '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">' +
+    '<rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>' +
+    '</container>');
+
+  var oebps = zip.folder('OEBPS');
+  oebps.file('style.css',
+    'body{font-family: Georgia, "Times New Roman", serif; line-height:1.6; margin:1.2em;}' +
+    'h1{font-size:1.35em; margin-bottom:0.8em;}' +
+    'p{margin:0 0 1em;}');
+
+  var visibleChapters = bookData.chapters.filter(function(c){ return !c.hidden; });
+  if(visibleChapters.length === 0) throw new Error('No puede quedar el libro sin capítulos visibles');
+
+  var imageCounter = 0;
+  var chapterMeta = [];
+
+  for(var i=0; i<visibleChapters.length; i++){
+    var ch = visibleChapters[i];
+    var tmp = document.createElement('div');
+    tmp.innerHTML = ch.html;
+
+    var imgs = Array.prototype.slice.call(tmp.querySelectorAll('img[src^="blob:"]'));
+    for(var j=0; j<imgs.length; j++){
+      var img = imgs[j];
+      var src = img.getAttribute('src');
+      try{
+        var resp = await fetch(src);
+        var blob = await resp.blob();
+        var ext = (blob.type && blob.type.split('/')[1]) || 'jpg';
+        var imgName = 'images/img' + (++imageCounter) + '.' + ext;
+        oebps.file(imgName, blob);
+        img.setAttribute('src', imgName);
+      } catch(e){
+        img.remove();
+      }
+    }
+
+    var fileName = 'chapter-' + (i+1) + '.xhtml';
+    var xhtml = '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n' +
+      '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>' + escapeXml(ch.title) +
+      '</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body>' +
+      '<h1>' + escapeXml(ch.title) + '</h1>\n' + tmp.innerHTML + '\n</body></html>';
+    oebps.file(fileName, xhtml);
+    chapterMeta.push({title: ch.title, file: fileName, id: 'chap' + (i+1)});
+  }
+
+  var uid = 'urn:uuid:' + generateUUID();
+  var navItems = chapterMeta.map(function(c){ return '<li><a href="' + c.file + '">' + escapeXml(c.title) + '</a></li>'; }).join('\n');
+  oebps.file('nav.xhtml',
+    '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n' +
+    '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">\n' +
+    '<head><title>Índice</title><link rel="stylesheet" type="text/css" href="style.css"/></head>\n' +
+    '<body>\n<nav epub:type="toc" id="toc"><h1>Índice</h1><ol>\n' + navItems + '\n</ol></nav>\n</body></html>');
+
+  var manifestItems = chapterMeta.map(function(c){ return '<item id="' + c.id + '" href="' + c.file + '" media-type="application/xhtml+xml"/>'; }).join('\n');
+  var spineItems = chapterMeta.map(function(c){ return '<itemref idref="' + c.id + '"/>'; }).join('\n');
+
+  oebps.file('content.opf',
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">\n' +
+    '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">\n' +
+    '<dc:identifier id="bookid">' + uid + '</dc:identifier>\n' +
+    '<dc:title>' + escapeXml(bookData.title) + '</dc:title>\n' +
+    (bookData.author ? ('<dc:creator>' + escapeXml(bookData.author) + '</dc:creator>\n') : '') +
+    '<dc:language>es</dc:language>\n' +
+    '<meta property="dcterms:modified">' + new Date().toISOString().replace(/\.\d+Z$/,'Z') + '</meta>\n' +
+    '</metadata>\n<manifest>\n' +
+    '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>\n' +
+    '<item id="css" href="style.css" media-type="text/css"/>\n' +
+    manifestItems + '\n</manifest>\n<spine>\n' + spineItems + '\n</spine>\n</package>');
+
+  var blob = await zip.generateAsync({type: 'blob', mimeType: 'application/epub+zip'});
+  return {blob: blob, chapters: visibleChapters};
 }
 
 /* ---------- Parse EPUB into a reading model ---------- */
@@ -1019,6 +1140,8 @@ async function parseEpubMeta(file){
   var selPopup = document.getElementById('sel-popup');
   var selHighlightBtn = document.getElementById('sel-highlight');
   var selNoteBtn = document.getElementById('sel-note');
+  var editToggleBtn = document.getElementById('edit-toggle');
+  var editSaveBtn = document.getElementById('edit-save');
 
   var book = null;
   var currentIndex = 0;
@@ -1028,6 +1151,7 @@ async function parseEpubMeta(file){
   var libCoverUrls = [];
   var pendingSelection = null;
   var scrollSaveTimer = null;
+  var editMode = false;
 
   function setLibStatus(msg, isError){
     libStatusEl.textContent = msg || '';
@@ -1310,6 +1434,7 @@ async function parseEpubMeta(file){
 
   async function openBookFromLibrary(id){
     setLibStatus('Abriendo…');
+    if(editMode) setEditMode(false);
     try{
       var record = await dbGetBook(id);
       if(!record){ setLibStatus('No se encontró ese libro.', true); return; }
@@ -1318,6 +1443,8 @@ async function parseEpubMeta(file){
       revokeAll();
       lastObjectUrls = data.objectUrls;
       data.id = record.id;
+      data.title = record.title;
+      data.author = record.author;
       data.epubBlob = record.epubBlob;
       data.coverBlob = record.coverBlob;
       data.addedAt = record.addedAt;
@@ -1363,9 +1490,65 @@ async function parseEpubMeta(file){
   });
 
   backToLibraryBtn.addEventListener('click', function(){
+    if(editMode){
+      if(!confirm('Tenés cambios de edición sin guardar en el archivo. ¿Salir igual y perderlos?')) return;
+      setEditMode(false);
+    }
     if(typeof stopSpeaking === 'function') stopSpeaking(true);
     if(book) saveProgress();
     showLibraryView();
+  });
+
+  /* ---- Edit mode: correct chapter text, titles, order and visibility ---- */
+
+  function setEditMode(on){
+    editMode = on;
+    chapterContent.contentEditable = on ? 'true' : 'false';
+    chapterContent.classList.toggle('editing', on);
+    editToggleBtn.textContent = on ? 'Salir de edición' : 'Editar';
+    editSaveBtn.style.display = on ? 'inline-block' : 'none';
+    renderToc();
+  }
+
+  editToggleBtn.addEventListener('click', function(){
+    if(!book) return;
+    if(editMode && book.chapters[currentIndex]){
+      book.chapters[currentIndex].html = chapterContent.innerHTML;
+    }
+    setEditMode(!editMode);
+  });
+
+  editSaveBtn.addEventListener('click', async function(){
+    if(!book) return;
+    if(book.chapters[currentIndex]) book.chapters[currentIndex].html = chapterContent.innerHTML;
+
+    var hiddenCount = book.chapters.filter(function(c){ return c.hidden; }).length;
+    if(hiddenCount > 0 && !confirm('Vas a quitar ' + hiddenCount + (hiddenCount===1?' capítulo marcado':' capítulos marcados') + ' como "Ocultar" del archivo. Esto no se puede deshacer. ¿Continuar?')){
+      return;
+    }
+
+    editSaveBtn.disabled = true;
+    editSaveBtn.textContent = 'Guardando…';
+    try{
+      var result = await rebuildEpubFromBook(book);
+      book.chapters = result.chapters;
+      book.chapters.forEach(function(c){ delete c.hidden; });
+      book.toc = book.chapters.map(function(ch, idx){ return {label: ch.title, depth: 0, index: idx, fragment: null}; });
+      book.chaptersCount = book.chapters.length;
+      book.epubBlob = result.blob;
+      if(currentIndex >= book.chapters.length) currentIndex = book.chapters.length - 1;
+      book.progress = {chapterIndex: currentIndex, scrollFraction: 0};
+      persistState();
+      setEditMode(false);
+      goToChapter(currentIndex, null);
+      renderLibrary();
+    } catch(err){
+      console.error(err);
+      alert('No se pudo guardar los cambios: ' + (err && err.message ? err.message : 'error desconocido'));
+    } finally {
+      editSaveBtn.disabled = false;
+      editSaveBtn.textContent = 'Guardar cambios en el archivo';
+    }
   });
 
   /* ---- Export / import the whole library ---- */
@@ -1450,6 +1633,7 @@ async function parseEpubMeta(file){
   /* ---- TOC ---- */
 
   function renderToc(){
+    if(editMode){ renderTocEditRows(); return; }
     tocList.innerHTML = '';
     book.toc.forEach(function(entry){
       var li = document.createElement('li');
@@ -1463,6 +1647,64 @@ async function parseEpubMeta(file){
         closeSidebarMobile();
       });
       li.appendChild(a);
+      tocList.appendChild(li);
+    });
+  }
+
+  function renderTocEditRows(){
+    tocList.innerHTML = '';
+    var hintLi = document.createElement('li');
+    hintLi.id = 'toc-edit-hint';
+    hintLi.textContent = 'Cambiá el título, reordená con las flechas, u "Ocultar" para quitar un capítulo al guardar.';
+    tocList.appendChild(hintLi);
+
+    book.chapters.forEach(function(ch, idx){
+      var li = document.createElement('li');
+      li.className = 'toc-edit-row';
+
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.value = ch.title;
+      input.addEventListener('input', function(){ ch.title = input.value; });
+
+      var upBtn = document.createElement('button');
+      upBtn.type = 'button'; upBtn.textContent = '▲'; upBtn.title = 'Subir';
+      upBtn.disabled = idx === 0;
+      upBtn.addEventListener('click', function(){
+        var tmp = book.chapters[idx-1];
+        book.chapters[idx-1] = book.chapters[idx];
+        book.chapters[idx] = tmp;
+        if(currentIndex === idx) currentIndex = idx-1;
+        else if(currentIndex === idx-1) currentIndex = idx;
+        renderTocEditRows();
+      });
+
+      var downBtn = document.createElement('button');
+      downBtn.type = 'button'; downBtn.textContent = '▼'; downBtn.title = 'Bajar';
+      downBtn.disabled = idx === book.chapters.length - 1;
+      downBtn.addEventListener('click', function(){
+        var tmp = book.chapters[idx+1];
+        book.chapters[idx+1] = book.chapters[idx];
+        book.chapters[idx] = tmp;
+        if(currentIndex === idx) currentIndex = idx+1;
+        else if(currentIndex === idx+1) currentIndex = idx;
+        renderTocEditRows();
+      });
+
+      var hideBtn = document.createElement('button');
+      hideBtn.type = 'button';
+      hideBtn.className = 'hide-toggle' + (ch.hidden ? ' hidden-on' : '');
+      hideBtn.textContent = ch.hidden ? 'Oculto' : 'Ocultar';
+      hideBtn.title = 'Quitar este capítulo al guardar';
+      hideBtn.addEventListener('click', function(){
+        ch.hidden = !ch.hidden;
+        renderTocEditRows();
+      });
+
+      li.appendChild(input);
+      li.appendChild(upBtn);
+      li.appendChild(downBtn);
+      li.appendChild(hideBtn);
       tocList.appendChild(li);
     });
   }
@@ -1513,6 +1755,9 @@ async function parseEpubMeta(file){
 
   function goToChapter(idx, fragment, restoreFraction){
     if(!book || idx < 0 || idx >= book.chapters.length) return;
+    if(editMode && book.chapters[currentIndex]){
+      book.chapters[currentIndex].html = chapterContent.innerHTML;
+    }
     currentIndex = idx;
     chapterContent.innerHTML = book.chapters[idx].html;
     toolbarTitle.textContent = book.title;
@@ -1538,6 +1783,7 @@ async function parseEpubMeta(file){
   }
 
   chapterContent.addEventListener('click', function(e){
+    if(editMode) return;
     var a = e.target.closest('a');
     if(!a || !book) return;
     var href = a.getAttribute('href');
@@ -1761,6 +2007,7 @@ async function parseEpubMeta(file){
 
   document.addEventListener('mouseup', function(e){
     if(!reader.classList.contains('show')) return;
+    if(editMode){ hideSelPopup(); return; }
     if(selPopup.contains(e.target)) return;
     if(!chapterContent.contains(e.target)){ hideSelPopup(); return; }
     var sel = window.getSelection();
