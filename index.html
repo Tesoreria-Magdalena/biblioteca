@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;0,600;0,700;1,500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
     --bg:#F3EEE3; --fg:#241F1A; --panel:#FBF8F1; --accent:#7A2E2E;
@@ -225,6 +226,8 @@
   .lib-toolbar button:hover{ border-color: var(--accent); }
   #lib-status{ margin: 16px 0 0; font-size:0.88rem; color: var(--muted); min-height:1.2em; line-height:1.5; }
   #lib-status.error{ color:#A23E2E; }
+  #drive-status{ margin: 4px 0 0; font-size:0.82rem; color: var(--muted); min-height:1.1em; }
+  #drive-status.error{ color:#A23E2E; }
   .lib-grid{
     display:grid; grid-template-columns: repeat(auto-fill, minmax(155px,1fr));
     gap: 24px; margin-top: 30px;
@@ -381,8 +384,11 @@
         <button id="export-btn">Exportar librero</button>
         <button id="import-btn">Importar librero</button>
         <input type="file" id="import-input" accept=".zip" hidden />
+        <button id="drive-connect-btn">Conectar Google Drive</button>
+        <button id="drive-backup-btn" style="display:none;">Respaldar a Drive</button>
       </div>
     </div>
+    <div id="drive-status"></div>
     <div id="lib-status"></div>
     <div class="lib-grid" id="lib-grid">
       <div class="lib-card add-tile" id="add-tile">
@@ -404,6 +410,8 @@
     <button class="icon-btn" id="bookmark-add">+ Marcador</button>
     <button class="icon-btn" id="listen-toggle">Escuchar</button>
     <button class="icon-btn" id="edit-toggle">Editar</button>
+    <button class="icon-btn" id="split-chapter-btn" style="display:none;">Partir capítulo aquí</button>
+    <button class="icon-btn" id="export-docx-btn" style="display:none;">Exportar a Word</button>
     <button class="icon-btn" id="edit-save" style="display:none;">Guardar cambios en el archivo</button>
     <div class="titles">
       <div class="t-title" id="toolbar-title"></div>
@@ -449,7 +457,7 @@
       </div>
     </div>
     <div id="content-wrap">
-      <article id="chapter-content"></article>
+      <article id="chapter-content" spellcheck="true" lang="es"></article>
       <div class="chapter-nav">
         <button id="prev-chapter">← Anterior</button>
         <button id="next-chapter">Siguiente →</button>
@@ -548,6 +556,14 @@
 </div>
 
 <script>
+/* ---------- Google Drive backup config ----------
+   Pegá acá tu propio Client ID (termina en .apps.googleusercontent.com),
+   generado en Google Cloud Console siguiendo los pasos que armamos.
+   Sin esto, el botón "Conectar Google Drive" no va a funcionar. */
+var GOOGLE_CLIENT_ID = '203205355217-o396ovkmjivfb16qdjdoc0vvqc69c6ou.apps.googleusercontent.com';
+var GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+var GOOGLE_DRIVE_FOLDER_NAME = 'Biblioteca de Ervin Santiago - Respaldos';
+
 function getElsByLocalName(doc, name){
   return Array.prototype.slice.call(doc.getElementsByTagName('*')).filter(function(e){
     return e.localName === name;
@@ -664,6 +680,82 @@ async function rebuildEpubFromBook(bookData){
 
   var blob = await zip.generateAsync({type: 'blob', mimeType: 'application/epub+zip'});
   return {blob: blob, chapters: visibleChapters};
+}
+
+/* Exports the current book as a minimal .docx: each chapter title becomes a
+   "Heading 1" paragraph (so Word's own outline / table-of-contents tools pick
+   them up) and each chapter's text becomes plain paragraphs, so Word's spell
+   checker and formatting tools can be used to fix the source content. */
+async function buildDocxFromBook(bookData){
+  var zip = new JSZip();
+
+  zip.file('[Content_Types].xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+    '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
+    '</Types>');
+
+  zip.folder('_rels').file('.rels',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+    '</Relationships>');
+
+  var word = zip.folder('word');
+  word.folder('_rels').file('document.xml.rels',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+    '</Relationships>');
+
+  word.file('styles.xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+    '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>' +
+    '<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:qFormat/>' +
+    '<w:pPr><w:spacing w:after="240"/></w:pPr><w:rPr><w:b/><w:sz w:val="44"/></w:rPr></w:style>' +
+    '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/>' +
+    '<w:pPr><w:keepNext/><w:spacing w:before="480" w:after="160"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="32"/></w:rPr></w:style>' +
+    '<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/>' +
+    '<w:pPr><w:keepNext/><w:spacing w:before="320" w:after="120"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style>' +
+    '</w:styles>');
+
+  function wp(text, style){
+    var t = '<w:p>';
+    if(style) t += '<w:pPr><w:pStyle w:val="' + style + '"/></w:pPr>';
+    t += '<w:r><w:t xml:space="preserve">' + escapeXml(text) + '</w:t></w:r></w:p>';
+    return t;
+  }
+
+  var bodyParts = [];
+  bodyParts.push(wp(bookData.title, 'Title'));
+  if(bookData.author) bodyParts.push(wp(bookData.author, null));
+
+  bookData.chapters.forEach(function(ch){
+    if(ch.hidden) return;
+    bodyParts.push(wp(ch.title, 'Heading1'));
+    var tmp = document.createElement('div');
+    tmp.innerHTML = ch.html;
+    var blocks = extractBlocks(tmp);
+    blocks.forEach(function(b){
+      var text = b.type === 'li' ? ('• ' + b.text) : b.text;
+      if(!text) return;
+      bodyParts.push(wp(text, b.type === 'heading' ? 'Heading2' : null));
+    });
+  });
+
+  var documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n' +
+    '<w:body>\n' + bodyParts.join('\n') + '\n<w:sectPr/>\n</w:body>\n</w:document>';
+  word.file('document.xml', documentXml);
+
+  return await zip.generateAsync({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  });
 }
 
 /* ---------- Parse EPUB into a reading model ---------- */
@@ -1107,6 +1199,9 @@ async function parseEpubMeta(file){
   var exportBtn = document.getElementById('export-btn');
   var importBtn = document.getElementById('import-btn');
   var importInput = document.getElementById('import-input');
+  var driveConnectBtn = document.getElementById('drive-connect-btn');
+  var driveBackupBtn = document.getElementById('drive-backup-btn');
+  var driveStatusEl = document.getElementById('drive-status');
 
   var reader = document.getElementById('reader');
   var sidebar = document.getElementById('sidebar');
@@ -1142,6 +1237,8 @@ async function parseEpubMeta(file){
   var selNoteBtn = document.getElementById('sel-note');
   var editToggleBtn = document.getElementById('edit-toggle');
   var editSaveBtn = document.getElementById('edit-save');
+  var splitChapterBtn = document.getElementById('split-chapter-btn');
+  var exportDocxBtn = document.getElementById('export-docx-btn');
 
   var book = null;
   var currentIndex = 0;
@@ -1507,6 +1604,8 @@ async function parseEpubMeta(file){
     chapterContent.classList.toggle('editing', on);
     editToggleBtn.textContent = on ? 'Salir de edición' : 'Editar';
     editSaveBtn.style.display = on ? 'inline-block' : 'none';
+    splitChapterBtn.style.display = on ? 'inline-block' : 'none';
+    exportDocxBtn.style.display = on ? 'inline-block' : 'none';
     renderToc();
   }
 
@@ -1516,6 +1615,57 @@ async function parseEpubMeta(file){
       book.chapters[currentIndex].html = chapterContent.innerHTML;
     }
     setEditMode(!editMode);
+  });
+
+  splitChapterBtn.addEventListener('click', function(){
+    if(!book || !editMode) return;
+    var sel = window.getSelection();
+    if(!sel || sel.rangeCount === 0 || !chapterContent.contains(sel.anchorNode)){
+      alert('Poné el cursor en el punto del texto donde querés que empiece el capítulo nuevo, y volvé a hacer clic en "Partir capítulo aquí".');
+      return;
+    }
+    var range = sel.getRangeAt(0);
+    var afterRange = document.createRange();
+    afterRange.setStart(range.startContainer, range.startOffset);
+    afterRange.setEnd(chapterContent, chapterContent.childNodes.length);
+    var afterFragment = afterRange.extractContents();
+    var wrapper = document.createElement('div');
+    wrapper.appendChild(afterFragment);
+
+    book.chapters[currentIndex].html = chapterContent.innerHTML;
+    var srcChapter = book.chapters[currentIndex];
+    var newChapter = {
+      title: 'Nueva sección',
+      html: wrapper.innerHTML,
+      path: (srcChapter.path || 'capitulo') + '-parte-' + Date.now(),
+      dir: srcChapter.dir,
+      autoTitle: null
+    };
+    book.chapters.splice(currentIndex + 1, 0, newChapter);
+    toolbarProgress.textContent = 'Capítulo ' + (currentIndex+1) + ' de ' + book.chapters.length;
+    nextBtn.disabled = false;
+    renderToc();
+  });
+
+  exportDocxBtn.addEventListener('click', async function(){
+    if(!book) return;
+    if(book.chapters[currentIndex]) book.chapters[currentIndex].html = chapterContent.innerHTML;
+    exportDocxBtn.disabled = true;
+    exportDocxBtn.textContent = 'Generando…';
+    try{
+      var blob = await buildDocxFromBook(book);
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = book.title.replace(/[\\/:*?"<>|]/g,'') + '.docx';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    } catch(err){
+      console.error(err);
+      alert('No se pudo exportar a Word: ' + (err && err.message ? err.message : 'error desconocido'));
+    } finally {
+      exportDocxBtn.disabled = false;
+      exportDocxBtn.textContent = 'Exportar a Word';
+    }
   });
 
   editSaveBtn.addEventListener('click', async function(){
@@ -1553,31 +1703,36 @@ async function parseEpubMeta(file){
 
   /* ---- Export / import the whole library ---- */
 
+  async function buildLibraryExportBlob(){
+    var records = await dbGetAllBooks();
+    if(records.length === 0) return null;
+    var zip = new JSZip();
+    var manifest = [];
+    for(var i=0; i<records.length; i++){
+      var r = records[i];
+      var epubName = 'books/' + r.id + '.epub';
+      zip.file(epubName, r.epubBlob);
+      var coverName = null;
+      if(r.coverBlob){
+        var ext = (r.coverBlob.type && r.coverBlob.type.split('/')[1]) || 'jpg';
+        coverName = 'covers/' + r.id + '.' + ext;
+        zip.file(coverName, r.coverBlob);
+      }
+      manifest.push(Object.assign({
+        id: r.id, title: r.title, author: r.author, chaptersCount: r.chaptersCount,
+        addedAt: r.addedAt, progress: r.progress, bookmarks: r.bookmarks, highlights: r.highlights,
+        epubFile: epubName, coverFile: coverName
+      }, FICHA_FIELDS.reduce(function(o,f){ o[f]=r[f]; return o; }, {})));
+    }
+    zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+    return await zip.generateAsync({type: 'blob'});
+  }
+
   exportBtn.addEventListener('click', async function(){
     try{
-      var records = await dbGetAllBooks();
-      if(records.length === 0){ setLibStatus('Tu librero está vacío — no hay nada que exportar.'); return; }
       setLibStatus('Armando el archivo de exportación…');
-      var zip = new JSZip();
-      var manifest = [];
-      for(var i=0; i<records.length; i++){
-        var r = records[i];
-        var epubName = 'books/' + r.id + '.epub';
-        zip.file(epubName, r.epubBlob);
-        var coverName = null;
-        if(r.coverBlob){
-          var ext = (r.coverBlob.type && r.coverBlob.type.split('/')[1]) || 'jpg';
-          coverName = 'covers/' + r.id + '.' + ext;
-          zip.file(coverName, r.coverBlob);
-        }
-        manifest.push(Object.assign({
-          id: r.id, title: r.title, author: r.author, chaptersCount: r.chaptersCount,
-          addedAt: r.addedAt, progress: r.progress, bookmarks: r.bookmarks, highlights: r.highlights,
-          epubFile: epubName, coverFile: coverName
-        }, FICHA_FIELDS.reduce(function(o,f){ o[f]=r[f]; return o; }, {})));
-      }
-      zip.file('manifest.json', JSON.stringify(manifest, null, 2));
-      var blob = await zip.generateAsync({type: 'blob'});
+      var blob = await buildLibraryExportBlob();
+      if(!blob){ setLibStatus('Tu librero está vacío — no hay nada que exportar.'); return; }
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       a.href = url; a.download = 'libreria-export.zip';
@@ -1587,6 +1742,125 @@ async function parseEpubMeta(file){
     } catch(err){
       console.error(err);
       setLibStatus('No se pudo exportar el librero.', true);
+    }
+  });
+
+  /* ---- Google Drive backup ---- */
+
+  var driveTokenClient = null;
+  var driveAccessToken = null;
+  var driveFolderId = null;
+  var driveConfigured = GOOGLE_CLIENT_ID.indexOf('TU_CLIENT_ID_AQUI') === -1;
+
+  function setDriveStatus(msg, isError){
+    driveStatusEl.textContent = msg || '';
+    driveStatusEl.classList.toggle('error', !!isError);
+  }
+
+  function updateDriveUI(connected){
+    driveConnectBtn.textContent = connected ? 'Drive conectado ✓' : 'Conectar Google Drive';
+    driveBackupBtn.style.display = connected ? 'inline-block' : 'none';
+  }
+
+  function initGoogleDrive(){
+    if(!driveConfigured){
+      driveConnectBtn.title = 'Falta configurar el Client ID de Google en el código de esta herramienta.';
+      return;
+    }
+    if(!window.google || !google.accounts || !google.accounts.oauth2){
+      setTimeout(initGoogleDrive, 400);
+      return;
+    }
+    driveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: GOOGLE_DRIVE_SCOPE,
+      callback: function(resp){
+        if(resp.error){
+          setDriveStatus('No se pudo conectar con Google Drive.', true);
+          return;
+        }
+        driveAccessToken = resp.access_token;
+        updateDriveUI(true);
+        setDriveStatus('Conectado. Ya podés respaldar cuando quieras.');
+      }
+    });
+  }
+  initGoogleDrive();
+
+  driveConnectBtn.addEventListener('click', function(){
+    if(!driveConfigured){
+      setDriveStatus('Falta pegar tu Client ID de Google en el código antes de poder conectar.', true);
+      return;
+    }
+    if(!driveTokenClient){
+      setDriveStatus('Google todavía está cargando, esperá un segundo y volvé a intentar.', true);
+      return;
+    }
+    driveTokenClient.requestAccessToken({prompt: driveAccessToken ? '' : 'consent'});
+  });
+
+  async function driveApiFetch(url, options){
+    options = options || {};
+    options.headers = Object.assign({}, options.headers, {'Authorization': 'Bearer ' + driveAccessToken});
+    var resp = await fetch(url, options);
+    if(resp.status === 401){
+      driveAccessToken = null;
+      updateDriveUI(false);
+      throw new Error('La conexión con Drive venció — conectate de nuevo.');
+    }
+    if(!resp.ok) throw new Error('Drive respondió con error ' + resp.status);
+    return resp;
+  }
+
+  async function findOrCreateDriveFolder(){
+    if(driveFolderId) return driveFolderId;
+    var q = encodeURIComponent("name = '" + GOOGLE_DRIVE_FOLDER_NAME.replace(/'/g,"\\'") + "' and mimeType = 'application/vnd.google-apps.folder' and trashed = false");
+    var listResp = await driveApiFetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)');
+    var listData = await listResp.json();
+    if(listData.files && listData.files.length > 0){
+      driveFolderId = listData.files[0].id;
+      return driveFolderId;
+    }
+    var createResp = await driveApiFetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: GOOGLE_DRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder'})
+    });
+    var createData = await createResp.json();
+    driveFolderId = createData.id;
+    return driveFolderId;
+  }
+
+  async function uploadBlobToDrive(blob, filename, folderId){
+    var metadata = {name: filename, mimeType: 'application/zip', parents: [folderId]};
+    var form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+    form.append('file', blob);
+    var resp = await driveApiFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      body: form
+    });
+    return await resp.json();
+  }
+
+  driveBackupBtn.addEventListener('click', async function(){
+    if(!driveAccessToken){ setDriveStatus('Conectate a Drive primero.', true); return; }
+    driveBackupBtn.disabled = true;
+    driveBackupBtn.textContent = 'Respaldando…';
+    try{
+      setDriveStatus('Armando el respaldo…');
+      var blob = await buildLibraryExportBlob();
+      if(!blob){ setDriveStatus('Tu librero está vacío — no hay nada que respaldar.', true); return; }
+      var folderId = await findOrCreateDriveFolder();
+      var stamp = new Date().toISOString().slice(0,10);
+      await uploadBlobToDrive(blob, 'biblioteca-' + stamp + '.zip', folderId);
+      setDriveStatus('Respaldo subido a Drive, carpeta "' + GOOGLE_DRIVE_FOLDER_NAME + '".');
+    } catch(err){
+      console.error(err);
+      setDriveStatus('No se pudo respaldar a Drive: ' + (err && err.message ? err.message : 'error desconocido'), true);
+    } finally {
+      driveBackupBtn.disabled = false;
+      driveBackupBtn.textContent = 'Respaldar a Drive';
     }
   });
 
