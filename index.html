@@ -305,6 +305,64 @@
   .tile-status-pill.terminado{ background: color-mix(in srgb, var(--forest, #2C4A3E) 18%, var(--panel)); color: #2C4A3E; border-color: transparent; }
   .lib-empty-hint{ margin-top:30px; color: var(--muted); font-size:0.92rem; text-align:center; display:none; }
 
+  /* ---------- Library search + view toggle ---------- */
+  .lib-controls{
+    display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:26px;
+  }
+  #lib-search{
+    flex:1; min-width:220px; font-family:'Source Sans 3', sans-serif; font-size:0.9rem;
+    border:1px solid var(--line); border-radius:3px; padding:10px 14px; background:#fff; color:#111;
+  }
+  .view-toggle{ display:flex; border:1px solid var(--line); border-radius:3px; overflow:hidden; flex-shrink:0; }
+  .view-toggle button{
+    background: var(--panel); border:none; color: var(--muted); font-family:'Source Sans 3', sans-serif;
+    font-size:0.85rem; font-weight:600; padding:9px 16px; cursor:pointer;
+  }
+  .view-toggle button.active{ background: var(--accent); color:#fff; }
+  #shelf-group-by{
+    font-family:'Source Sans 3', sans-serif; font-size:0.85rem; border:1px solid var(--line);
+    border-radius:3px; padding:9px 12px; background:#fff; color:#111; flex-shrink:0;
+  }
+
+  /* ---------- Shelves (anaqueles) ---------- */
+  #shelves-view{ margin-top:32px; }
+  .shelf-row{ margin-bottom:38px; }
+  .shelf-row .shelf-label{
+    font-family:'Fraunces', serif; font-weight:600; font-size:1.05rem; margin:0 0 12px;
+    display:flex; align-items:baseline; gap:8px; color: var(--fg);
+  }
+  .shelf-row .shelf-label .count{ font-size:0.76rem; color: var(--muted); font-weight:400; }
+  .shelf{
+    display:flex; gap:5px; overflow-x:auto; padding:6px 4px 20px;
+    border-bottom:3px solid var(--line);
+  }
+  .spine-wrap{ perspective:800px; flex-shrink:0; width:54px; height:200px; cursor:pointer; }
+  .spine-card{
+    width:100%; height:100%; position:relative; transform-style:preserve-3d;
+    transition: transform 0.45s ease;
+  }
+  .spine-wrap:hover .spine-card, .spine-wrap.flipped .spine-card{ transform: rotateY(180deg); }
+  .spine-face{
+    position:absolute; inset:0; backface-visibility:hidden; border-radius:2px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.22);
+  }
+  .spine-front{
+    background: var(--accent);
+    background: linear-gradient(165deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 55%, black) 100%);
+    display:flex; align-items:center; justify-content:center; padding:12px 4px;
+  }
+  .spine-front .spine-title{
+    writing-mode: vertical-rl; color:#fff; font-family:'Fraunces', serif; font-weight:600;
+    font-size:0.72rem; letter-spacing:0.02em; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; max-height:100%;
+  }
+  .spine-back{ transform: rotateY(180deg); overflow:hidden; background: var(--panel); }
+  .spine-back img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .spine-back .cover-placeholder{ width:100%; height:100%; padding:6px; }
+  .spine-back .cover-placeholder .initial{ font-size:1.2rem; }
+  .spine-back .cover-placeholder .rule{ margin:6px 0; }
+  .spine-back .cover-placeholder .mini-title{ font-size:0.48rem; -webkit-line-clamp:5; }
+
   /* ---------- Ficha del libro (modal) ---------- */
   .ficha-overlay{
     display:none; position:fixed; inset:0; z-index:40;
@@ -390,16 +448,35 @@
     </div>
     <div id="drive-status"></div>
     <div id="lib-status"></div>
-    <div class="lib-grid" id="lib-grid">
-      <div class="lib-card add-tile" id="add-tile">
-        <div>
-          <strong>+ Agregar libro</strong>
-          <span>Hacé clic o arrastrá un EPUB</span>
-        </div>
+
+    <div class="lib-controls">
+      <input type="text" id="lib-search" placeholder="Buscar por título, autor, categoría o colección…" />
+      <div class="view-toggle">
+        <button class="view-btn active" id="view-grid-btn" type="button">Grilla</button>
+        <button class="view-btn" id="view-shelves-btn" type="button">Anaqueles</button>
       </div>
-      <input type="file" id="file-input" accept=".epub,application/epub+zip" hidden />
+      <select id="shelf-group-by" style="display:none;">
+        <option value="genres">Agrupar por: Categoría</option>
+        <option value="author">Agrupar por: Autor</option>
+        <option value="readStatus">Agrupar por: Estado de lectura</option>
+        <option value="series">Agrupar por: Colección/serie</option>
+      </select>
     </div>
-    <p class="lib-empty-hint" id="lib-empty-hint">Todavía no agregaste ningún libro.</p>
+
+    <div id="grid-view">
+      <div class="lib-grid" id="lib-grid">
+        <div class="lib-card add-tile" id="add-tile">
+          <div>
+            <strong>+ Agregar libro</strong>
+            <span>Hacé clic o arrastrá un EPUB</span>
+          </div>
+        </div>
+        <input type="file" id="file-input" accept=".epub,application/epub+zip" hidden />
+      </div>
+      <p class="lib-empty-hint" id="lib-empty-hint">Todavía no agregaste ningún libro.</p>
+    </div>
+
+    <div id="shelves-view" style="display:none;"></div>
   </div>
 </div>
 
@@ -514,8 +591,26 @@
         <label>Páginas
           <input type="text" id="ficha-pages" />
         </label>
-        <label class="span2">Género / etiquetas
-          <input type="text" id="ficha-genres" placeholder="ej. novela, realismo mágico" />
+        <label class="span2">Categoría
+          <select id="ficha-genres">
+            <option value="">Sin categoría</option>
+            <optgroup label="Ficción">
+              <option value="Clásicos">Clásicos</option>
+              <option value="Narrativa">Narrativa</option>
+              <option value="Poesía y Teatro">Poesía y Teatro</option>
+              <option value="Ciencia ficción y fantasía">Ciencia ficción y fantasía</option>
+              <option value="Policial y suspenso">Policial y suspenso</option>
+            </optgroup>
+            <optgroup label="No ficción">
+              <option value="Ensayo">Ensayo</option>
+              <option value="Biografía y memorias">Biografía y memorias</option>
+              <option value="Historia">Historia</option>
+              <option value="Filosofía">Filosofía</option>
+              <option value="Ciencia y divulgación">Ciencia y divulgación</option>
+              <option value="Economía y negocios">Economía y negocios</option>
+              <option value="Autoayuda y desarrollo personal">Autoayuda y desarrollo personal</option>
+            </optgroup>
+          </select>
         </label>
         <label class="span2">Colección / serie
           <input type="text" id="ficha-series" placeholder="ej. El Club Diógenes #12" />
@@ -1202,6 +1297,14 @@ async function parseEpubMeta(file){
   var driveConnectBtn = document.getElementById('drive-connect-btn');
   var driveBackupBtn = document.getElementById('drive-backup-btn');
   var driveStatusEl = document.getElementById('drive-status');
+  var libSearchInput = document.getElementById('lib-search');
+  var viewGridBtn = document.getElementById('view-grid-btn');
+  var viewShelvesBtn = document.getElementById('view-shelves-btn');
+  var shelfGroupBySelect = document.getElementById('shelf-group-by');
+  var gridViewEl = document.getElementById('grid-view');
+  var shelvesViewEl = document.getElementById('shelves-view');
+  var currentLibView = 'grid';
+  var libSearchQuery = '';
 
   var reader = document.getElementById('reader');
   var sidebar = document.getElementById('sidebar');
@@ -1318,6 +1421,12 @@ async function parseEpubMeta(file){
     'por-leer': 'Por leer', 'leyendo': 'Leyendo', 'terminado': 'Terminado', 'abandonado': 'Abandonado'
   };
 
+  var CATEGORIES = [
+    'Clásicos', 'Narrativa', 'Poesía y Teatro', 'Ciencia ficción y fantasía', 'Policial y suspenso',
+    'Ensayo', 'Biografía y memorias', 'Historia', 'Filosofía', 'Ciencia y divulgación',
+    'Economía y negocios', 'Autoayuda y desarrollo personal'
+  ];
+
   function buildBookTile(rec){
     var tile = document.createElement('div');
     tile.className = 'lib-card book-tile';
@@ -1411,6 +1520,111 @@ async function parseEpubMeta(file){
     return tile;
   }
 
+  function matchesLibSearch(rec, q){
+    if(!q) return true;
+    var hay = [rec.title, rec.author, rec.genres, rec.series].filter(Boolean).join(' ').toLowerCase();
+    return hay.indexOf(q) !== -1;
+  }
+
+  function groupLabelFor(field, value){
+    if(field === 'readStatus') return STATUS_LABELS[value] || 'Sin definir';
+    if(field === 'genres') return value || 'Sin categoría';
+    if(field === 'author') return value || 'Autor desconocido';
+    if(field === 'series') return value || 'Sin colección';
+    return value || 'Sin definir';
+  }
+
+  function sortGroupKeys(field, keys){
+    if(field === 'genres'){
+      var order = CATEGORIES.concat(['Sin categoría']);
+      return keys.sort(function(a,b){
+        var ia = order.indexOf(a); if(ia === -1) ia = order.length;
+        var ib = order.indexOf(b); if(ib === -1) ib = order.length;
+        return ia - ib;
+      });
+    }
+    return keys.sort(function(a,b){ return a.localeCompare(b, 'es'); });
+  }
+
+  function buildSpineElement(rec){
+    var wrap = document.createElement('div');
+    wrap.className = 'spine-wrap';
+    var card = document.createElement('div'); card.className = 'spine-card';
+
+    var front = document.createElement('div'); front.className = 'spine-face spine-front';
+    var titleSpan = document.createElement('span'); titleSpan.className = 'spine-title';
+    titleSpan.textContent = rec.title;
+    front.appendChild(titleSpan);
+
+    var back = document.createElement('div'); back.className = 'spine-face spine-back';
+    if(rec.coverBlob){
+      var url = URL.createObjectURL(rec.coverBlob);
+      libCoverUrls.push(url);
+      var img = document.createElement('img'); img.src = url; img.alt = '';
+      back.appendChild(img);
+    } else {
+      var ph = document.createElement('div'); ph.className = 'cover-placeholder';
+      var initial = document.createElement('div'); initial.className = 'initial';
+      initial.textContent = (rec.title || '?').trim().charAt(0).toUpperCase();
+      var rule = document.createElement('div'); rule.className = 'rule';
+      var mini = document.createElement('div'); mini.className = 'mini-title'; mini.textContent = rec.title || '';
+      ph.appendChild(initial); ph.appendChild(rule); ph.appendChild(mini);
+      back.appendChild(ph);
+    }
+
+    card.appendChild(front); card.appendChild(back);
+    wrap.appendChild(card);
+
+    wrap.addEventListener('click', function(){
+      var touchOnly = window.matchMedia && window.matchMedia('(hover: none)').matches;
+      if(touchOnly && !wrap.classList.contains('flipped')){
+        Array.prototype.slice.call(document.querySelectorAll('.spine-wrap.flipped')).forEach(function(el){
+          el.classList.remove('flipped');
+        });
+        wrap.classList.add('flipped');
+        return;
+      }
+      openBookFromLibrary(rec.id);
+    });
+
+    return wrap;
+  }
+
+  function renderShelves(records){
+    shelvesViewEl.innerHTML = '';
+    if(records.length === 0){
+      var p = document.createElement('p');
+      p.className = 'lib-empty-hint'; p.style.display = 'block';
+      p.textContent = 'No hay libros para mostrar acá.';
+      shelvesViewEl.appendChild(p);
+      return;
+    }
+    var field = shelfGroupBySelect.value;
+    var groups = {};
+    records.forEach(function(r){
+      var key = groupLabelFor(field, r[field]);
+      if(!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    });
+    var keys = sortGroupKeys(field, Object.keys(groups));
+
+    keys.forEach(function(key){
+      var group = groups[key].slice().sort(function(a,b){
+        return (a.title || '').localeCompare(b.title || '', 'es');
+      });
+      var row = document.createElement('div'); row.className = 'shelf-row';
+      var label = document.createElement('div'); label.className = 'shelf-label';
+      var nameSpan = document.createElement('span'); nameSpan.textContent = key;
+      var countSpan = document.createElement('span'); countSpan.className = 'count';
+      countSpan.textContent = group.length + (group.length === 1 ? ' libro' : ' libros');
+      label.appendChild(nameSpan); label.appendChild(countSpan);
+      var shelf = document.createElement('div'); shelf.className = 'shelf';
+      group.forEach(function(rec){ shelf.appendChild(buildSpineElement(rec)); });
+      row.appendChild(label); row.appendChild(shelf);
+      shelvesViewEl.appendChild(row);
+    });
+  }
+
   async function renderLibrary(){
     revokeLibCovers();
     Array.prototype.slice.call(libGrid.querySelectorAll('.book-tile')).forEach(function(el){ el.remove(); });
@@ -1422,10 +1636,43 @@ async function parseEpubMeta(file){
       console.error(err);
       setLibStatus('No se pudo acceder al almacenamiento de este navegador para guardar libros. Si estás probando esto dentro del chat de Claude, subí este archivo a tu GitHub Pages y abrilo desde ahí.', true);
     }
-    records.sort(function(a,b){ return (b.addedAt||0) - (a.addedAt||0); });
-    records.forEach(function(rec){ libGrid.appendChild(buildBookTile(rec)); });
-    libEmptyHint.style.display = records.length ? 'none' : 'block';
+    var q = libSearchQuery.trim().toLowerCase();
+    records = records.filter(function(r){ return matchesLibSearch(r, q); });
+
+    if(currentLibView === 'shelves'){
+      gridViewEl.style.display = 'none';
+      shelvesViewEl.style.display = 'block';
+      libEmptyHint.style.display = 'none';
+      renderShelves(records);
+    } else {
+      shelvesViewEl.style.display = 'none';
+      gridViewEl.style.display = 'block';
+      records.sort(function(a,b){ return (b.addedAt||0) - (a.addedAt||0); });
+      records.forEach(function(rec){ libGrid.appendChild(buildBookTile(rec)); });
+      libEmptyHint.style.display = records.length ? 'none' : 'block';
+    }
   }
+
+  libSearchInput.addEventListener('input', function(){
+    libSearchQuery = libSearchInput.value;
+    renderLibrary();
+  });
+
+  viewGridBtn.addEventListener('click', function(){
+    currentLibView = 'grid';
+    viewGridBtn.classList.add('active');
+    viewShelvesBtn.classList.remove('active');
+    shelfGroupBySelect.style.display = 'none';
+    renderLibrary();
+  });
+  viewShelvesBtn.addEventListener('click', function(){
+    currentLibView = 'shelves';
+    viewShelvesBtn.classList.add('active');
+    viewGridBtn.classList.remove('active');
+    shelfGroupBySelect.style.display = 'inline-block';
+    renderLibrary();
+  });
+  shelfGroupBySelect.addEventListener('change', renderLibrary);
 
   /* ---- Ficha del libro (bibliographic + personal tracking fields) ---- */
 
@@ -1477,7 +1724,7 @@ async function parseEpubMeta(file){
     fichaPublisher.value = rec.publisher || '';
     fichaLanguage.value = rec.language || '';
     fichaPages.value = rec.pages || '';
-    fichaGenres.value = rec.genres || '';
+    fichaGenres.value = CATEGORIES.indexOf(rec.genres) !== -1 ? rec.genres : '';
     fichaSeries.value = rec.series || '';
     fichaStatus.value = rec.readStatus || '';
     fichaDateStart.value = rec.dateStart || '';
