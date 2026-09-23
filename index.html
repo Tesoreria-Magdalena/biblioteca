@@ -6,13 +6,26 @@
 <title>Biblioteca de Ervin Santiago</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;0,600;0,700;1,500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;0,600;0,700;1,500&family=Space+Grotesk:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
     --bg:#F3EEE3; --fg:#241F1A; --panel:#FBF8F1; --accent:#7A2E2E;
-    --muted:#6b5f52; --line:#E1D8C4;
+    --muted:#6b5f52; --line:#E1D8C4; --heading-font: 'Fraunces';
+  }
+
+  /* The library screen (home/bookshelf) has its own fixed, modern palette —
+     independent from the reader's light/sepia/dark themes below, so switching
+     reading themes never bleeds into the library. Scoped here so every existing
+     rule that already uses var(--bg)/var(--panel)/etc. picks this up automatically. */
+  #library-view, #ficha-overlay, .spine-peek{
+    --bg:#F5F9FC; --panel:#FFFFFF; --fg:#1C2B36; --accent:#1B5D8C;
+    --muted:#5B6B78; --line:#D9E5EE; --heading-font: 'Space Grotesk';
+  }
+  #library-view{
+    min-height:100vh;
+    background: linear-gradient(180deg, #F5F9FC 0%, #EAF3FA 55%, #E3EFF8 100%);
   }
   *{ box-sizing: border-box; }
   html,body{ margin:0; padding:0; height:100%; }
@@ -154,7 +167,7 @@
     cursor: text;
   }
   #chapter-content h1, #chapter-content h2, #chapter-content h3{
-    font-family: 'Fraunces', serif; font-weight:600; line-height:1.25;
+    font-family: var(--heading-font), serif; font-weight:600; line-height:1.25;
     margin: 1.2em 0 0.5em;
   }
   #chapter-content p{ margin: 0 0 1.05em; }
@@ -215,15 +228,16 @@
   #library-view{ display:block; }
   .lib-wrap{ max-width: 1100px; margin: 0 auto; padding: 48px 24px 80px; }
   .lib-header{ display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:4px; }
-  .lib-header h1{ font-family:'Fraunces', serif; font-weight:600; font-size:2rem; margin:0 0 6px; letter-spacing:-0.01em; }
+  .lib-header h1{ font-family: var(--heading-font), serif; font-weight:600; font-size:2.1rem; margin:0 0 6px; letter-spacing:-0.02em; }
   .lib-header p{ color: var(--muted); margin:0; font-size:0.93rem; max-width: 480px; line-height:1.5; }
   .lib-toolbar{ display:flex; gap:10px; flex-wrap: wrap; }
   .lib-toolbar button{
     font-family:'Source Sans 3', sans-serif; font-size:0.85rem; font-weight:600;
     border:1px solid var(--line); background: var(--panel); color: var(--fg);
-    border-radius:3px; padding:9px 14px; cursor:pointer;
+    border-radius:10px; padding:9px 16px; cursor:pointer;
+    box-shadow: 0 1px 2px rgba(28,43,54,0.06);
   }
-  .lib-toolbar button:hover{ border-color: var(--accent); }
+  .lib-toolbar button:hover{ border-color: var(--accent); box-shadow: 0 2px 6px rgba(28,43,54,0.1); }
   #lib-status{ margin: 16px 0 0; font-size:0.88rem; color: var(--muted); min-height:1.2em; line-height:1.5; }
   #lib-status.error{ color:#A23E2E; }
   #drive-status{ margin: 4px 0 0; font-size:0.82rem; color: var(--muted); min-height:1.1em; }
@@ -233,18 +247,19 @@
     gap: 24px; margin-top: 30px;
   }
   .add-tile{
-    border:1.5px dashed var(--line); border-radius:4px; aspect-ratio: 2/3;
+    border:1.5px dashed var(--line); border-radius:14px; aspect-ratio: 2/3;
     display:flex; align-items:center; justify-content:center; text-align:center;
     cursor:pointer; background: var(--panel); padding:14px;
     transition: border-color 0.15s ease, background 0.15s ease;
   }
-  .add-tile:hover, .add-tile.drag{ border-color: var(--accent); background:#F3E4E1; }
+  .add-tile:hover, .add-tile.drag{ border-color: var(--accent); background:#EAF3FA; }
   .add-tile strong{ display:block; font-size:0.9rem; margin-bottom:6px; }
   .add-tile span{ color: var(--muted); font-size:0.78rem; }
   .book-tile{ display:flex; flex-direction:column; }
   .cover-wrap{
-    position:relative; aspect-ratio: 2/3; border-radius:4px; overflow:hidden;
+    position:relative; aspect-ratio: 2/3; border-radius:14px; overflow:hidden;
     background: var(--panel); border:1px solid var(--line); cursor:pointer;
+    box-shadow: 0 2px 10px rgba(28,43,54,0.08);
   }
   .cover-wrap img{ width:100%; height:100%; object-fit:cover; display:block; }
   .cover-placeholder{
@@ -263,7 +278,7 @@
     pointer-events:none;
   }
   .cover-placeholder .initial{
-    font-family:'Fraunces', serif; font-weight:600; font-size:2.3rem; line-height:1;
+    font-family: var(--heading-font), serif; font-weight:600; font-size:2.3rem; line-height:1;
     position:relative; z-index:1;
   }
   .cover-placeholder .rule{
@@ -278,7 +293,7 @@
   }
   .cover-upload-btn{
     position:absolute; bottom:6px; left:6px; right:6px;
-    background: rgba(0,0,0,0.6); color:#fff; border:none; border-radius:3px;
+    background: rgba(0,0,0,0.6); color:#fff; border:none; border-radius:8px;
     font-size:0.7rem; padding:6px 4px; cursor:pointer;
     font-family:'Source Sans 3', sans-serif;
   }
@@ -289,16 +304,16 @@
   }
   .tile-ficha-btn{
     position:absolute; top:6px; left:6px;
-    background: rgba(0,0,0,0.6); color:#fff; border:none; border-radius:3px;
+    background: rgba(0,0,0,0.6); color:#fff; border:none; border-radius:8px;
     font-size:0.68rem; padding:4px 8px; cursor:pointer;
     font-family:'Source Sans 3', sans-serif;
   }
-  .tile-title{ font-family:'Fraunces', serif; font-weight:600; font-size:0.9rem; margin:10px 0 2px; line-height:1.3; }
+  .tile-title{ font-family: var(--heading-font), serif; font-weight:600; font-size:0.9rem; margin:10px 0 2px; line-height:1.3; }
   .tile-author{ color: var(--muted); font-size:0.78rem; margin:0 0 4px; }
   .tile-progress{ color: var(--accent); font-size:0.75rem; font-weight:600; }
   .tile-meta{ color: var(--muted); font-size:0.74rem; margin:2px 0 0; }
   .tile-status-pill{
-    display:inline-block; margin-top:6px; padding:2px 8px; border-radius:10px;
+    display:inline-block; margin-top:6px; padding:2px 9px; border-radius:20px;
     font-size:0.68rem; font-weight:600; background: var(--panel); border:1px solid var(--line); color: var(--muted);
   }
   .tile-status-pill.leyendo{ background: color-mix(in srgb, var(--accent) 16%, var(--panel)); color: var(--accent); border-color: transparent; }
@@ -311,24 +326,26 @@
   }
   #lib-search{
     flex:1; min-width:220px; font-family:'Source Sans 3', sans-serif; font-size:0.9rem;
-    border:1px solid var(--line); border-radius:3px; padding:10px 14px; background:#fff; color:#111;
+    border:1px solid var(--line); border-radius:12px; padding:11px 16px; background:#fff; color:#111;
+    box-shadow: 0 1px 2px rgba(28,43,54,0.05);
   }
-  .view-toggle{ display:flex; border:1px solid var(--line); border-radius:3px; overflow:hidden; flex-shrink:0; }
+  #lib-search:focus{ outline:none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .view-toggle{ display:flex; border:1px solid var(--line); border-radius:12px; overflow:hidden; flex-shrink:0; }
   .view-toggle button{
     background: var(--panel); border:none; color: var(--muted); font-family:'Source Sans 3', sans-serif;
-    font-size:0.85rem; font-weight:600; padding:9px 16px; cursor:pointer;
+    font-size:0.85rem; font-weight:600; padding:10px 18px; cursor:pointer;
   }
   .view-toggle button.active{ background: var(--accent); color:#fff; }
   #shelf-group-by{
     font-family:'Source Sans 3', sans-serif; font-size:0.85rem; border:1px solid var(--line);
-    border-radius:3px; padding:9px 12px; background:#fff; color:#111; flex-shrink:0;
+    border-radius:12px; padding:9px 14px; background:#fff; color:#111; flex-shrink:0;
   }
 
   /* ---------- Shelves (anaqueles) ---------- */
   #shelves-view{ margin-top:32px; }
   .shelf-row{ margin-bottom:38px; }
   .shelf-row .shelf-label{
-    font-family:'Fraunces', serif; font-weight:600; font-size:1.05rem; margin:0 0 12px;
+    font-family: var(--heading-font), serif; font-weight:600; font-size:1.05rem; margin:0 0 12px;
     display:flex; align-items:baseline; gap:8px; color: var(--fg);
   }
   .shelf-row .shelf-label .count{ font-size:0.76rem; color: var(--muted); font-weight:400; }
@@ -338,15 +355,14 @@
   }
   .spine-wrap{
     flex-shrink:0; cursor:pointer; border-radius:2px 2px 1px 1px;
-    background: var(--accent);
-    background: linear-gradient(165deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 55%, black) 100%);
+    background-color: var(--accent);
     box-shadow: 0 2px 5px rgba(0,0,0,0.22), inset -2px 0 3px rgba(0,0,0,0.15);
     display:flex; align-items:center; justify-content:center; padding:12px 3px;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
   .spine-wrap:hover{ transform: translateY(-5px); box-shadow: 0 8px 14px rgba(0,0,0,0.3); }
   .spine-wrap .spine-title{
-    writing-mode: vertical-rl; color:#fff; font-family:'Fraunces', serif; font-weight:600;
+    writing-mode: vertical-rl; color: inherit; font-family: var(--heading-font), serif; font-weight:600;
     font-size:0.72rem; letter-spacing:0.02em; white-space:nowrap; overflow:hidden;
     text-overflow:ellipsis; max-height:100%;
   }
@@ -376,17 +392,17 @@
   }
   .ficha-overlay.show{ display:flex; }
   .ficha-modal{
-    background: var(--card, var(--panel)); border-radius:6px; width:100%; max-width:560px;
-    max-height:88vh; overflow-y:auto; box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+    background: var(--card, var(--panel)); border-radius:18px; width:100%; max-width:560px;
+    max-height:88vh; overflow-y:auto; box-shadow: 0 20px 50px rgba(20,35,50,0.25);
   }
   .ficha-header{
     display:flex; align-items:center; justify-content:space-between;
     padding:18px 22px; border-bottom:1px solid var(--line);
     position:sticky; top:0; background: var(--card, var(--panel));
   }
-  .ficha-header h3{ font-family:'Fraunces', serif; font-weight:600; font-size:1.15rem; margin:0; }
+  .ficha-header h3{ font-family: var(--heading-font), serif; font-weight:600; font-size:1.15rem; margin:0; }
   .ficha-header button{
-    background:none; border:1px solid var(--line); border-radius:3px; color: var(--muted);
+    background:none; border:1px solid var(--line); border-radius:9px; color: var(--muted);
     font-family:'Source Sans 3', sans-serif; font-size:0.82rem; padding:6px 12px; cursor:pointer;
   }
   .ficha-body{ padding:20px 22px; }
@@ -398,7 +414,10 @@
   .ficha-grid label.span2{ grid-column: 1 / -1; }
   .ficha-grid input, .ficha-grid select, .ficha-grid textarea{
     font-family:'Source Sans 3', sans-serif; font-size:0.88rem; color: var(--fg);
-    border:1px solid var(--line); border-radius:3px; padding:8px 10px; background:#fff;
+    border:1px solid var(--line); border-radius:10px; padding:9px 11px; background:#fff;
+  }
+  .ficha-grid input:focus, .ficha-grid select:focus, .ficha-grid textarea:focus{
+    outline:none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
   }
   .ficha-grid textarea{ resize:vertical; min-height:70px; }
   @media (max-width:520px){ .ficha-grid{ grid-template-columns:1fr; } }
@@ -414,8 +433,8 @@
   }
   .ficha-footer button{
     font-family:'Source Sans 3', sans-serif; font-weight:600; font-size:0.88rem;
-    background: var(--accent); color:#fff; border:none; border-radius:3px;
-    padding:10px 20px; cursor:pointer;
+    background: var(--accent); color:#fff; border:none; border-radius:10px;
+    padding:10px 22px; cursor:pointer;
   }
 
   #sel-popup{
@@ -619,6 +638,15 @@
         </label>
         <label class="span2">Colección / serie
           <input type="text" id="ficha-series" placeholder="ej. El Club Diógenes #12" />
+        </label>
+        <label>Subtipo
+          <input type="text" id="ficha-subtype" placeholder="ej. Realismo mágico" />
+        </label>
+        <label>Color de lomo (opcional)
+          <input type="text" id="ficha-spine-color" placeholder="ej. #355B73 — vacío usa el de la categoría" />
+        </label>
+        <label>Color de texto del lomo (opcional)
+          <input type="text" id="ficha-spine-ink" placeholder="ej. #F5F0E7" />
         </label>
         <label>Estado de lectura
           <select id="ficha-status">
@@ -1234,6 +1262,63 @@ async function dbDeleteBook(id){
 
 /* Lightweight parse used only when adding a book: title/author/cover/chapter count,
    without walking every chapter (that happens in parseEpubForReading, on open). */
+/* ---------- DANTA shelf taxonomy (curated spine colors per category) ---------- */
+
+var DANTA_TAXONOMY = {
+  "Ficción": {
+    "Clásicos": { color: "#EEE5D3", ink: "#25231F", subtypes: ["Universales", "Latinoamericanos", "Centroamericanos", "Modernos"] },
+    "Narrativa": { color: "#355B73", ink: "#F5F0E7", subtypes: ["Contemporánea", "Histórica", "Literaria", "Realismo mágico"] },
+    "Poesía y Teatro": { color: "#6B405F", ink: "#F7F0E7", subtypes: ["Poesía", "Teatro", "Poesía dramática"] },
+    "Ciencia ficción y fantasía": { color: "#3F4A61", ink: "#F4F0E8", subtypes: ["Ciencia ficción", "Distopía", "Fantasía", "Horror"] },
+    "Policial y suspenso": { color: "#7A2934", ink: "#F7F0E8", subtypes: ["Policial", "Thriller", "Noir", "Gótico"] }
+  },
+  "No ficción": {
+    "Ensayo": { color: "#8B6337", ink: "#F8F0E2", subtypes: ["Literario", "Cultural", "Político", "Social"] },
+    "Biografía y memorias": { color: "#7B6856", ink: "#F8F3E9", subtypes: ["Biografía", "Memorias", "Diarios", "Epistolario"] },
+    "Historia": { color: "#596B45", ink: "#F5F0E6", subtypes: ["Guatemala y Centroamérica", "Hispanoamérica", "Universal", "Historia de las ideas"] },
+    "Filosofía": { color: "#183A5A", ink: "#F4EFE4", collection: "GALIMATÍAS", subtypes: ["Filosofía política", "Ética", "Metafísica", "Estética", "Filosofía de la ciencia"] },
+    "Ciencia y divulgación": { color: "#2E6B68", ink: "#F0F5F1", subtypes: ["Naturaleza", "Medicina", "Tecnología", "Cosmos"] },
+    "Economía y negocios": { color: "#1D5E9A", ink: "#F3F7FB", subtypes: ["Finanzas", "Economía", "Gestión", "Estrategia", "Mercados"] },
+    "Autoayuda y desarrollo personal": { color: "#A66A3F", ink: "#FFF8EE", subtypes: ["Hábitos", "Bienestar", "Liderazgo", "Carrera"] }
+  }
+};
+
+var DANTA_DEFAULT_SPINE = { color: "#4A4742", ink: "#F7F1E7" };
+
+/* Flattened subcategory -> {color, ink, collection, topCategory} — our ficha only
+   stores the subcategory (e.g. "Narrativa"), so this is how a spine finds its color
+   without needing a separate top-level category field. */
+var DANTA_FLAT = (function(){
+  var flat = {};
+  Object.keys(DANTA_TAXONOMY).forEach(function(topCategory){
+    var sub = DANTA_TAXONOMY[topCategory];
+    Object.keys(sub).forEach(function(subcategory){
+      flat[subcategory] = Object.assign({topCategory: topCategory}, sub[subcategory]);
+    });
+  });
+  return flat;
+})();
+
+function readDantaMeta(opfDoc, key){
+  var metas = getElsByLocalName(opfDoc, 'meta');
+  var propMatch = metas.find(function(m){ return m.getAttribute('property') === 'danta:' + key; });
+  if(propMatch && propMatch.textContent && propMatch.textContent.trim()) return propMatch.textContent.trim();
+  var nameMatch = metas.find(function(m){ return m.getAttribute('name') === 'danta:' + key; });
+  if(nameMatch){
+    var c = nameMatch.getAttribute('content');
+    if(c && c.trim()) return c.trim();
+  }
+  return null;
+}
+
+function getSpineStyle(rec){
+  var def = DANTA_FLAT[rec.genres] || DANTA_DEFAULT_SPINE;
+  return {
+    color: (rec.spineColorOverride && rec.spineColorOverride.trim()) || def.color,
+    ink: (rec.spineInkOverride && rec.spineInkOverride.trim()) || def.ink
+  };
+}
+
 async function parseEpubMeta(file){
   var buf = await file.arrayBuffer();
   var zip = await JSZip.loadAsync(buf);
@@ -1264,8 +1349,19 @@ async function parseEpubMeta(file){
 
   var titleEl = getElsByLocalName(opfDoc, 'title')[0];
   var creatorEl = getElsByLocalName(opfDoc, 'creator')[0];
+  var publisherEl = getElsByLocalName(opfDoc, 'publisher')[0];
   var title = titleEl ? titleEl.textContent.trim() : file.name.replace(/\.epub$/i, '');
   var author = creatorEl ? creatorEl.textContent.trim() : '';
+  var publisher = publisherEl ? publisherEl.textContent.trim() : '';
+
+  var dantaSubcategory = readDantaMeta(opfDoc, 'subcategory');
+  var dantaCollection = readDantaMeta(opfDoc, 'collection');
+  var dantaSubtype = readDantaMeta(opfDoc, 'subtype');
+  var dantaSpineColor = readDantaMeta(opfDoc, 'spine-color');
+  var dantaSpineInk = readDantaMeta(opfDoc, 'spine-ink');
+  if(!dantaCollection && dantaSubcategory && DANTA_FLAT[dantaSubcategory]){
+    dantaCollection = DANTA_FLAT[dantaSubcategory].collection || null;
+  }
 
   var coverBlob = null;
   var ids = Object.keys(manifest);
@@ -1284,7 +1380,14 @@ async function parseEpubMeta(file){
     }
   }
 
-  return {title: title, author: author, coverBlob: coverBlob, chaptersCount: spineRefs.length};
+  return {
+    title: title, author: author, publisher: publisher, coverBlob: coverBlob, chaptersCount: spineRefs.length,
+    genres: (dantaSubcategory && DANTA_FLAT[dantaSubcategory]) ? dantaSubcategory : '',
+    series: dantaCollection || '',
+    subtype: dantaSubtype || '',
+    spineColorOverride: dantaSpineColor || '',
+    spineInkOverride: dantaSpineInk || ''
+  };
 }
 
 /* ---------- Reader UI ---------- */
@@ -1398,6 +1501,12 @@ async function parseEpubMeta(file){
         id: id,
         title: meta.title,
         author: meta.author,
+        publisher: meta.publisher || '',
+        genres: meta.genres || '',
+        series: meta.series || '',
+        subtype: meta.subtype || '',
+        spineColorOverride: meta.spineColorOverride || '',
+        spineInkOverride: meta.spineInkOverride || '',
         chaptersCount: meta.chaptersCount,
         epubBlob: file,
         coverBlob: meta.coverBlob,
@@ -1631,8 +1740,15 @@ async function parseEpubMeta(file){
     wrap.style.width = dims.width + 'px';
     wrap.style.height = dims.height + 'px';
 
+    var spineStyle = getSpineStyle(rec);
+    wrap.style.backgroundColor = spineStyle.color;
+    wrap.style.color = spineStyle.ink;
+    wrap.dataset.category = rec.genres || '';
+    wrap.dataset.collection = rec.series || '';
+
     var titleSpan = document.createElement('span'); titleSpan.className = 'spine-title';
     titleSpan.textContent = rec.title;
+    titleSpan.style.color = spineStyle.ink;
     wrap.appendChild(titleSpan);
 
     var touchOnly = window.matchMedia && window.matchMedia('(hover: none)').matches;
@@ -1742,7 +1858,7 @@ async function parseEpubMeta(file){
 
   /* ---- Ficha del libro (bibliographic + personal tracking fields) ---- */
 
-  var FICHA_FIELDS = ['year','country','publisher','language','pages','genres','series','readStatus','rating','dateStart','dateEnd','review'];
+  var FICHA_FIELDS = ['year','country','publisher','language','pages','genres','series','subtype','spineColorOverride','spineInkOverride','readStatus','rating','dateStart','dateEnd','review'];
 
   var fichaOverlay = document.getElementById('ficha-overlay');
   var fichaClose = document.getElementById('ficha-close');
@@ -1756,6 +1872,9 @@ async function parseEpubMeta(file){
   var fichaPages = document.getElementById('ficha-pages');
   var fichaGenres = document.getElementById('ficha-genres');
   var fichaSeries = document.getElementById('ficha-series');
+  var fichaSubtype = document.getElementById('ficha-subtype');
+  var fichaSpineColor = document.getElementById('ficha-spine-color');
+  var fichaSpineInk = document.getElementById('ficha-spine-ink');
   var fichaStatus = document.getElementById('ficha-status');
   var fichaRatingEl = document.getElementById('ficha-rating');
   var fichaDateStart = document.getElementById('ficha-date-start');
@@ -1792,6 +1911,9 @@ async function parseEpubMeta(file){
     fichaPages.value = rec.pages || '';
     fichaGenres.value = CATEGORIES.indexOf(rec.genres) !== -1 ? rec.genres : '';
     fichaSeries.value = rec.series || '';
+    fichaSubtype.value = rec.subtype || '';
+    fichaSpineColor.value = rec.spineColorOverride || '';
+    fichaSpineInk.value = rec.spineInkOverride || '';
     fichaStatus.value = rec.readStatus || '';
     fichaDateStart.value = rec.dateStart || '';
     fichaDateEnd.value = rec.dateEnd || '';
@@ -1823,6 +1945,9 @@ async function parseEpubMeta(file){
       rec.pages = fichaPages.value.trim();
       rec.genres = fichaGenres.value.trim();
       rec.series = fichaSeries.value.trim();
+      rec.subtype = fichaSubtype.value.trim();
+      rec.spineColorOverride = fichaSpineColor.value.trim();
+      rec.spineInkOverride = fichaSpineInk.value.trim();
       rec.readStatus = fichaStatus.value;
       rec.rating = fichaRatingValue || null;
       rec.dateStart = fichaDateStart.value;
